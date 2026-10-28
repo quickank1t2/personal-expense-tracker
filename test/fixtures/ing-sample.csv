@@ -1,0 +1,19 @@
+Umsatzanzeige;Datei erstellt am: 01.01.2025 00:00
+
+IBAN;DE00 1234 5678 9012 3456 78
+Kontoname;Girokonto
+Bank;ING
+Kunde;Test User
+Zeitraum;01.01.2025 - 01.01.2025
+Saldo;1.000,00;EUR
+
+Sortierung;Datum absteigend
+
+In der CSV-Datei finden Sie alle bereits gebuchten Umsaetze.
+
+Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung
+15.03.2025;15.03.2025;REWE MARKT GMBH;Lastschrift;Kd.-Nr. 12345 Rechnung 2025-03;REF001;971,31;EUR;-28,69;EUR
+10.03.2025;10.03.2025;Test Employer GmbH;Gutschrift;Gehalt Maerz 2025;REF002;1.000,00;EUR;3.000,00;EUR
+05.03.2025;05.03.2025;Neodigital Versicherung AG;Lastschrift;Versicherungsnummer 987654 Maerz 2025;REF003;-2.000,00;EUR;-23,35;EUR
+01.03.2025;01.03.2025;PAYPAL EUROPE SARL;Lastschrift;1099887766/PP.1234.PP/. Einkauf bei Testshop;REF004;-1.976,65;EUR;-14,99;EUR
+27.02.2025;27.02.2025;Test Sender;Gutschrift Echtzeitueberweisung;Erstattung Februar;;-1.961,66;EUR;200,00;EUR

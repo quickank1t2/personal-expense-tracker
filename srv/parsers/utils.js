@@ -20,11 +20,16 @@ function parseCsvRow(line) {
   return cols
 }
 
-function parseAmexDate(str) {
+function parseEuropeanDate(str) {
   if (!str) return null
-  const [d, m, y] = str.split('/')
+  const sep = str.includes('/') ? '/' : '.'
+  const [d, m, y] = str.split(sep)
   if (!d || !m || !y) return null
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+}
+
+function normaliseText(str) {
+  return str?.trim().replace(/\s+/g, ' ') ?? ''
 }
 
 function parseGermanAmount(str) {
@@ -32,4 +37,4 @@ function parseGermanAmount(str) {
   return parseFloat(str.replace(/\./g, '').replace(',', '.'))
 }
 
-module.exports = { parseRows, parseCsvRow, parseAmexDate, parseGermanAmount }
+module.exports = { parseRows, parseCsvRow, parseEuropeanDate, normaliseText, parseGermanAmount }
