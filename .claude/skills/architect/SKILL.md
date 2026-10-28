@@ -29,9 +29,10 @@ Once you have the requirement, confirm in one sentence: "Understood. Analysing: 
 Act as a SAP CAP solution architect. Run these reads **in parallel** before producing any output:
 
 **Project source files:**
-- `db/schema.cds`
-- `srv/expense-service.cds`
-- `srv/expense-service.js`
+- `db/schema/tables/` (read all `.cds` files: `Categories.cds`, `Budgets.cds`, `Expenses.cds`)
+- `db/schema/types/index.cds`
+- `srv/apis/expense-service.cds`
+- `srv/apis/expense-service.js`
 - `app/tracker/annotations.cds`
 - `test/expense-service.test.js`
 
@@ -52,9 +53,9 @@ Rewrite the requirement precisely from a technical perspective. One paragraph. W
 
 **Task Decomposition**
 Numbered list. Each item is a discrete deliverable. Tag each with the layer it touches:
-- `[db]` — entity or field changes in `db/schema.cds`
-- `[srv-model]` — service definition changes in `srv/expense-service.cds`
-- `[srv-logic]` — handler or business logic changes in `srv/expense-service.js`
+- `[db]` — entity or field changes in `db/schema/tables/` or `db/schema/types/`
+- `[srv-model]` — service definition changes in `srv/apis/{service}.cds`
+- `[srv-logic]` — handler or business logic changes in `srv/apis/{service}.js`
 - `[ui]` — annotation changes in `app/tracker/annotations.cds`
 - `[test]` — new or updated tests in `test/expense-service.test.js`
 

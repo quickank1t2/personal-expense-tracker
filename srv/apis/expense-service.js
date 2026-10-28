@@ -1,12 +1,5 @@
 const cds = require('@sap/cds')
 
-// ---------------------------------------------------------------------------
-// Bank-specific CSV parsers
-// Each parser receives the raw CSV string and returns an array of expense
-// objects shaped as { date, amount, currency, description }.
-// Add new parsers here as new banks are onboarded.
-// ---------------------------------------------------------------------------
-
 const parsers = {
 
   GENERIC(csv) {
@@ -32,10 +25,6 @@ const parsers = {
     throw new Error('Emex parser not yet implemented')
   }
 }
-
-// ---------------------------------------------------------------------------
-// Service handler
-// ---------------------------------------------------------------------------
 
 module.exports = class ExpenseService extends cds.ApplicationService {
   async init() {
@@ -83,10 +72,6 @@ module.exports = class ExpenseService extends cds.ApplicationService {
     return super.init()
   }
 }
-
-// ---------------------------------------------------------------------------
-// Shared CSV row parser
-// ---------------------------------------------------------------------------
 
 function parseRows(csv, mapFn) {
   const lines = csv.split(/\r?\n/).filter(Boolean)

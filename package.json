@@ -15,6 +15,7 @@
   },
   "private": true,
   "cds": {
+    "model": ["db", "srv/apis"],
     "requires": {
       "auth": {
         "kind": "mocked",

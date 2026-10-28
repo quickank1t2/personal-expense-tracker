@@ -1,4 +1,4 @@
-using ExpenseService from '../../srv/expense-service';
+using ExpenseService from '../../srv/apis/expense-service';
 
 annotate ExpenseService.Expenses with @(
   UI.LineItem: [
