@@ -1,37 +1,5 @@
 const cds = require('@sap/cds')
-
-const parsers = {
-
-  GENERIC(csv) {
-    return parseRows(csv, (cols) => ({
-      date:        cols[0]?.trim(),
-      amount:      Math.abs(parseFloat(cols[1])),
-      description: cols[2]?.trim(),
-      _category:   cols[3]?.trim()
-    }))
-  },
-
-  ING(_csv) {
-    throw new Error('ING parser not yet implemented')
-  },
-
-  SPARKASSE(_csv) {
-    throw new Error('Sparkasse parser not yet implemented')
-  },
-
-  AMEX(csv) {
-    const lines = csv.split(/\r?\n/).filter(Boolean)
-    const dataLines = lines[0]?.toLowerCase().includes('datum') ? lines.slice(1) : lines
-    return dataLines.map(line => {
-      const cols = parseCsvRow(line)
-      const date = parseAmexDate(cols[0]?.trim())
-      const amount = parseGermanAmount(cols[4]?.trim())
-      const description = cols[1]?.trim().replace(/\s+/g, ' ')
-      // cols[2] = Karteninhaber (discarded), cols[3] = Konto # (discarded)
-      return { date, amount, description }
-    }).filter(Boolean)
-  }
-}
+const parsers = require('./parsers')
 
 module.exports = class ExpenseService extends cds.ApplicationService {
   async init() {
@@ -86,39 +54,4 @@ module.exports = class ExpenseService extends cds.ApplicationService {
 
     return super.init()
   }
-}
-
-function parseRows(csv, mapFn) {
-  const lines = csv.split(/\r?\n/).filter(Boolean)
-  const dataLines = lines[0]?.toLowerCase().includes('date') ? lines.slice(1) : lines
-  return dataLines.map(line => {
-    const cols = line.split(',')
-    return mapFn(cols)
-  }).filter(Boolean)
-}
-
-function parseCsvRow(line) {
-  const cols = []
-  let cur = '', inQuotes = false
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (ch === '"') { inQuotes = !inQuotes }
-    else if (ch === ',' && !inQuotes) { cols.push(cur); cur = '' }
-    else { cur += ch }
-  }
-  cols.push(cur)
-  return cols
-}
-
-function parseAmexDate(str) {
-  if (!str) return null
-  const [d, m, y] = str.split('/')
-  if (!d || !m || !y) return null
-  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-}
-
-function parseGermanAmount(str) {
-  if (!str) return NaN
-  // Remove period thousand-separators, replace comma decimal with dot
-  return parseFloat(str.replace(/\./g, '').replace(',', '.'))
 }
