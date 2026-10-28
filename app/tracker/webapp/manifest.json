@@ -1,0 +1,91 @@
+{
+  "_version": "1.58.0",
+  "sap.app": {
+    "id": "my.expensetracker.tracker",
+    "type": "application",
+    "title": "Personal Expense Tracker",
+    "description": "Track personal expenses and budgets",
+    "dataSources": {
+      "mainService": {
+        "uri": "/odata/v4/expenses/",
+        "type": "OData",
+        "settings": {
+          "odataVersion": "4.0"
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  "sap.ui5": {
+    "dependencies": {
+      "minUI5Version": "1.120.0",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.fe.templates": {}
+      }
+    },
+    "models": {
+      "": {
+        "dataSource": "mainService",
+        "settings": {
+          "synchronizationMode": "None",
+          "operationMode": "Server",
+          "autoExpandSelect": true,
+          "earlyRequests": true
+        }
+      }
+    },
+    "routing": {
+      "routes": [
+        {
+          "pattern": ":?query:",
+          "name": "ExpensesList",
+          "target": "ExpensesList"
+        },
+        {
+          "pattern": "Expenses({key}):?query:",
+          "name": "ExpensesObjectPage",
+          "target": "ExpensesObjectPage"
+        }
+      ],
+      "targets": {
+        "ExpensesList": {
+          "type": "Component",
+          "id": "ExpensesList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "entitySet": "Expenses",
+              "variantManagement": "Page",
+              "navigation": {
+                "Expenses": {
+                  "detail": {
+                    "route": "ExpensesObjectPage"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "ExpensesObjectPage": {
+          "type": "Component",
+          "id": "ExpensesObjectPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "entitySet": "Expenses"
+            }
+          }
+        }
+      }
+    }
+  }
+}
