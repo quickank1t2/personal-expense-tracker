@@ -188,17 +188,17 @@ describe('ExpenseService', () => {
     ].join('\n')
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
     const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'ING THOUSAND SEP SHOP: Grosskauf Mai\'')
-    expect(data.value[0].amount).toBe(-1299)
+    expect(data.value[0].amount).toBe(1299)
   })
 
-  it('importExpenses - ING imports credit row with positive amount', async () => {
+  it('importExpenses - ING imports credit row with negative amount', async () => {
     const csv = [
       'Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung',
       '10.05.2025;10.05.2025;ING CREDIT SENDER;Gutschrift;Erstattung Test;;1.000,00;EUR;500,00;EUR'
     ].join('\n')
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
     const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'ING CREDIT SENDER: Erstattung Test\'')
-    expect(data.value[0].amount).toBe(500)
+    expect(data.value[0].amount).toBe(-500)
   })
 
   it('importExpenses - ING description composition: counterparty + purpose', async () => {

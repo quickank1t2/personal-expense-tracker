@@ -15,7 +15,7 @@ module.exports = function ING(csv) {
     const date = parseIngDate(cols[0]?.trim())
     const counterparty = cols[2]?.trim().replace(/\s+/g, ' ') ?? ''
     const purpose = cols[4]?.trim().replace(/\s+/g, ' ') ?? ''
-    const amount = parseGermanAmount(cols[8]?.trim())
+    const amount = -parseGermanAmount(cols[8]?.trim())
     const description = purpose ? `${counterparty}: ${purpose}` : counterparty
     return { date, amount, description }
   })
