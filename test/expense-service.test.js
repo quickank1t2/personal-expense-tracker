@@ -153,4 +153,100 @@ describe('ExpenseService', () => {
     expect(data.skipped).toBe(1)
     expect(data.duplicates).toBe(0)
   })
+
+  // --- ING parser tests ---
+
+  it('importExpenses - ING happy path imports all rows', async () => {
+    const csv = fs.readFileSync(
+      path.join(__dirname, 'fixtures/ing-sample.csv'), 'utf8'
+    )
+    const { data } = await POST('/odata/v4/expenses/importExpenses', {
+      bankType: 'ING',
+      csv
+    })
+    expect(data.imported).toBe(5)
+    expect(data.skipped).toBe(0)
+    expect(data.duplicates).toBe(0)
+  })
+
+  it('importExpenses - ING converts DD.MM.YYYY date to YYYY-MM-DD', async () => {
+    const csv = [
+      'Umsatzanzeige;test',
+      '',
+      'Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung',
+      '23.04.2025;23.04.2025;ING DATE TEST SHOP;Lastschrift;Rechnung April;;500,00;EUR;-42,00;EUR'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'ING DATE TEST SHOP: Rechnung April\'')
+    expect(data.value[0].date).toBe('2025-04-23')
+  })
+
+  it('importExpenses - ING parses German amount with thousand separator', async () => {
+    const csv = [
+      'Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung',
+      '05.05.2025;05.05.2025;ING THOUSAND SEP SHOP;Lastschrift;Grosskauf Mai;;0,00;EUR;-1.299,00;EUR'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'ING THOUSAND SEP SHOP: Grosskauf Mai\'')
+    expect(data.value[0].amount).toBe(-1299)
+  })
+
+  it('importExpenses - ING imports credit row with positive amount', async () => {
+    const csv = [
+      'Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung',
+      '10.05.2025;10.05.2025;ING CREDIT SENDER;Gutschrift;Erstattung Test;;1.000,00;EUR;500,00;EUR'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'ING CREDIT SENDER: Erstattung Test\'')
+    expect(data.value[0].amount).toBe(500)
+  })
+
+  it('importExpenses - ING description composition: counterparty + purpose', async () => {
+    const csv = [
+      'Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung',
+      '12.05.2025;12.05.2025;ING COMPOSE SHOP;Lastschrift;Zweck der Zahlung;;0,00;EUR;-10,00;EUR'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'ING COMPOSE SHOP: Zweck der Zahlung\'')
+    expect(data.value).toHaveLength(1)
+  })
+
+  it('importExpenses - ING description fallback to counterparty when purpose is empty', async () => {
+    const csv = [
+      'Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung',
+      '13.05.2025;13.05.2025;ING FALLBACK SENDER;Gutschrift Echtzeitueberweisung;;;0,00;EUR;100,00;EUR'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'ING FALLBACK SENDER\'')
+    expect(data.value).toHaveLength(1)
+  })
+
+  it('importExpenses - ING missing preamble returns 400 with descriptive message', async () => {
+    const csv = 'not-an-ing-file,at,all'
+    await expect(
+      POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    ).rejects.toMatchObject({ response: { status: 400 } })
+  })
+
+  it('importExpenses - ING deduplication: re-importing same CSV counts as duplicates', async () => {
+    const csv = [
+      'Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung',
+      '20.05.2025;20.05.2025;ING DEDUP SHOP;Lastschrift;Dedup Test;;0,00;EUR;-50,00;EUR'
+    ].join('\n')
+    const first = await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    expect(first.data.imported).toBe(1)
+    const second = await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    expect(second.data.imported).toBe(0)
+    expect(second.data.duplicates).toBe(1)
+  })
+
+  it('importExpenses - ING malformed row (bad date) counted in skipped', async () => {
+    const csv = [
+      'Buchung;Wertstellungsdatum;Auftraggeber/Empfaenger;Buchungstext;Verwendungszweck;Referenz;Saldo;Waehrung;Betrag;Waehrung',
+      'BADDATE;BADDATE;ING MALFORMED SHOP;Lastschrift;Bad date row;;0,00;EUR;-9,99;EUR'
+    ].join('\n')
+    const { data } = await POST('/odata/v4/expenses/importExpenses', { bankType: 'ING', csv })
+    expect(data.skipped).toBe(1)
+    expect(data.duplicates).toBe(0)
+  })
 })

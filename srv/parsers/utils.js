@@ -27,9 +27,16 @@ function parseAmexDate(str) {
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
+function parseIngDate(str) {
+  if (!str) return null
+  const [d, m, y] = str.split('.')
+  if (!d || !m || !y) return null
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+}
+
 function parseGermanAmount(str) {
   if (!str) return NaN
   return parseFloat(str.replace(/\./g, '').replace(',', '.'))
 }
 
-module.exports = { parseRows, parseCsvRow, parseAmexDate, parseGermanAmount }
+module.exports = { parseRows, parseCsvRow, parseAmexDate, parseIngDate, parseGermanAmount }
