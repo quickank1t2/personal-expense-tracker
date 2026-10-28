@@ -6,7 +6,6 @@ annotate ExpenseService.Expenses with @(
     { Value: description,       Label: 'Description' },
     { Value: category.name,     Label: 'Category'    },
     { Value: amount,            Label: 'Amount'      },
-    { Value: currency,          Label: 'Currency'    },
     { Value: source,            Label: 'Source'      }
   ],
   UI.HeaderInfo: {
@@ -26,7 +25,6 @@ annotate ExpenseService.Expenses with @(
     Data: [
       { Value: date        },
       { Value: amount      },
-      { Value: currency    },
       { Value: description },
       { Value: category_ID, Label: 'Category' },
       { Value: source      }

@@ -22,10 +22,11 @@ db/
     my.expensetracker-*.csv        ← seed data (naming: {namespace}-{Entity}.csv)
 
 srv/
+  index.cds                        ← entry point: using from './apis'
+  expense-service.js               ← ExpenseService handler logic
   apis/
-    index.cds                      ← using from each service file
-    expense-service.cds            ← ExpenseService OData V4 definition
-    expense-service.js             ← ExpenseService handler (same name as .cds)
+    index.cds                      ← using from each service .cds file
+    expense-service.cds            ← ExpenseService OData V4 definition (@impl points to srv/expense-service.js)
 
 app/
   tracker/
@@ -79,16 +80,17 @@ specs/                             ← Requirement specs created by /architect
 
 ## Guidelines for AI: adding new services
 
-1. Create `srv/apis/{service-name}.cds` with the service definition. Import from `'../../db/schema'`:
+1. Create `srv/apis/{service-name}.cds` with the service definition. Import from `'../../db/schema'` and add `@impl` pointing to the handler:
    ```cds
    using my.expensetracker as my from '../../db/schema';
 
    @path: '{path}'
+   @impl: 'srv/{service-name}'
    service {ServiceName} @(requires: 'User') {
      // projections, actions, functions...
    }
    ```
-2. Create `srv/apis/{service-name}.js` with the handler class (same base name as the .cds file so CAP auto-discovers it):
+2. Create `srv/{service-name}.js` with the handler class (in `srv/`, not `srv/apis/`):
    ```js
    const cds = require('@sap/cds')
    module.exports = class {ServiceName} extends cds.ApplicationService {
@@ -98,7 +100,7 @@ specs/                             ← Requirement specs created by /architect
      }
    }
    ```
-3. Register in `srv/apis/index.cds`:
+3. Register the `.cds` in `srv/apis/index.cds`:
    ```cds
    using from './{service-name}';
    ```
@@ -120,7 +122,7 @@ npm test       # Jest integration tests
 | **Expense** | A single spending record: date, amount, currency, description, category FK, source (bank) |
 | **Category** | Named bucket (Food, Transport, etc.) with optional budget association |
 | **Budget** | Decimal amount cap associated with a Category |
-| **bankType** | CSV format identifier: `GENERIC`, `ING`, `SPARKASSE`, `EMEX` |
+| **bankType** | CSV format identifier: `GENERIC`, `ING`, `SPARKASSE`, `AMEX` |
 | **source** | The `bankType` value stamped on each imported Expense row |
 
 ## Requirement workflow
