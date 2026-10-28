@@ -14,6 +14,7 @@ mta_archives/
 
 # Other
 .DS_Store
+prod-data/
 
 # @cap-js/cds-typer
 @cds-models
