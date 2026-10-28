@@ -1,6 +1,6 @@
 # SPEC: Add ING Bank CSV Parser
 
-**Status:** draft
+**Status:** implemented
 **Created:** 2026-10-29
 **Slug:** add-ing-bank-csv-parser
 **GitHub Issue:** https://github.com/quickank1t2/personal-expense-tracker/issues/2
@@ -17,7 +17,9 @@ The real ING CSV export (German locale) is structurally different from all other
 
 ## Solution
 
-Replace the `ING` stub with a fully working parser. The parser will dynamically locate the `Buchung;` column-header row, skip all preamble lines above it, then parse each subsequent data row: booking date (col 0) → ISO date, counterparty (col 2) + purpose (col 4) → description, signed amount (col 8) → decimal. If no `Buchung;` header row is found, the parser throws a clear, actionable error rather than silently importing zero rows. All other import mechanics (deduplication, skipped/duplicates counters, the service dispatcher) are already in place and require no changes.
+Replace the `ING` stub with a fully working parser. The parser will dynamically locate the `Buchung;` column-header row, skip all preamble lines above it, then parse each subsequent data row: booking date (col 0) → ISO date, counterparty (col 2) + purpose (col 4) → description, amount (col 8) → negated decimal. If no `Buchung;` header row is found, the parser throws a clear, actionable error rather than silently importing zero rows. All other import mechanics (deduplication, skipped/duplicates counters, the service dispatcher) are already in place and require no changes.
+
+The ING raw amount sign is inverted on import: ING marks debits as negative (`-129,00`) and credits as positive (`3.000,00`), which is opposite to AMEX's convention. Negating on parse aligns both parsers to the shared convention: **positive = money out (expense), negative = money in (income/credit)**.
 
 A `parseIngDate` helper will be added to `srv/parsers/utils.js` to handle the dot-separated `DD.MM.YYYY` format. The existing `parseGermanAmount` helper reuses as-is.
 
@@ -27,10 +29,10 @@ A `parseIngDate` helper will be added to `srv/parsers/utils.js` to handle the do
 
 1. As a user, I want to import my ING Girokonto CSV export using `bankType: 'ING'`, so that my ING transactions appear in the expense tracker without a 400 error.
 2. As a user, I want ING booking dates (`DD.MM.YYYY`) automatically converted to ISO format (`YYYY-MM-DD`), so that dates are stored and sorted correctly.
-3. As a user, I want ING amounts in German locale format (`-129,00` / `3.000,00`) parsed to proper signed decimals, so that both debits and credits are recorded accurately.
+3. As a user, I want ING debit amounts normalised to positive values and credit amounts to negative values, so that the sign convention matches AMEX and is consistent across all parsers (positive = money out, negative = money in).
 4. As a user, I want the description to combine the counterparty name and the purpose text (`"{counterparty}: {purpose}"`), so that I can tell apart the many PayPal or insurance rows from each other.
 5. As a user, I want rows where the purpose is empty to fall back to the counterparty name alone as the description, so that no row ends up with a trailing colon or empty string.
-6. As a user, I want credit rows (positive amounts from Gutschrift, Echtzeit-Überweisung) imported at their positive signed value, so I have a complete picture of account inflows and outflows.
+6. As a user, I want credit rows (Gutschrift, Echtzeit-Überweisung) stored as negative amounts, so that inflows are clearly distinguishable from outflows and consistent with AMEX's convention.
 7. As a user, I want re-importing the same ING CSV to count existing rows as duplicates rather than inserting them again, so I can safely re-run imports.
 8. As a user, I want a clear error if I accidentally pass a CSV without the ING preamble/header row (e.g. a file manually trimmed in Excel), so that I know what went wrong rather than getting a silent empty import.
 
@@ -65,9 +67,11 @@ None. The dispatcher (`parsers[bankType.toUpperCase()]`) and the shared import/d
    - col 0 → `parseIngDate(...)` → `date`
    - col 2 → counterparty (trim, collapse whitespace)
    - col 4 → purpose (trim, collapse whitespace)
-   - col 8 → `parseGermanAmount(...)` → `amount`
+   - col 8 → `-parseGermanAmount(...)` → `amount` (negated to match shared sign convention)
    - description: if purpose is non-empty → `"${counterparty}: ${purpose}"`; else → `counterparty`
 5. Return `{ date, amount, description }`. Rows where `date` is null or `amount` is NaN are returned as-is and counted `skipped` by the existing import loop.
+
+**Sign convention:** ING encodes debits as negative and credits as positive. Negating on parse inverts this so that debits (expenses) are stored as positive and credits (income) as negative — matching AMEX's convention and establishing a uniform cross-parser standard.
 
 **`srv/parsers/utils.js`** — export `parseIngDate` alongside existing exports.
 
@@ -82,15 +86,15 @@ None.
 - Fixture at `test/fixtures/ing-sample.csv`: 5+ structurally-authentic rows using the full 10-column semicolon format with realistic-looking preamble. Invented names and amounts only — never real account data.
 
 New test cases:
-- [ ] ING happy path: fixture with 5 valid rows → `imported: 5, skipped: 0, duplicates: 0`
-- [ ] ING date conversion: imported row has `date` stored as `YYYY-MM-DD`
-- [ ] ING German amount: `"-129,00"` → stored as `-129`; `"3.000,00"` → stored as `3000`
-- [ ] ING negative amount (credit): positive-amount Gutschrift row imported with positive sign
-- [ ] ING description composition: row with non-empty purpose stored as `"{counterparty}: {purpose}"`
-- [ ] ING description fallback: row with empty purpose stored as counterparty name only
-- [ ] ING missing preamble: CSV without `Buchung;` header row → 400 error with descriptive message
-- [ ] ING deduplication: re-importing same CSV → `imported: 0, duplicates: N`
-- [ ] ING malformed row (bad date): counted in `skipped`, not `duplicates`
+- [x] ING happy path: fixture with 5 valid rows → `imported: 5, skipped: 0, duplicates: 0`
+- [x] ING date conversion: imported row has `date` stored as `YYYY-MM-DD`
+- [x] ING German amount: `"-1.299,00"` (debit) → stored as `+1299`; sign negated on parse
+- [x] ING credit row: `"500,00"` (Gutschrift) → stored as `-500`
+- [x] ING description composition: row with non-empty purpose stored as `"{counterparty}: {purpose}"`
+- [x] ING description fallback: row with empty purpose stored as counterparty name only
+- [x] ING missing preamble: CSV without `Buchung;` header row → 400 error with descriptive message
+- [x] ING deduplication: re-importing same CSV → `imported: 0, duplicates: N`
+- [x] ING malformed row (bad date): counted in `skipped`, not `duplicates`
 
 ---
 
@@ -99,7 +103,7 @@ New test cases:
 1. ✅ Booking date (col 0, `Buchung`) is the canonical expense date; value date (col 1) is discarded.
 2. ✅ Description is `"{counterparty}: {purpose}"` with whitespace collapsed; falls back to counterparty-only when purpose is empty.
 3. ✅ `Buchungstext` (col 3, transaction type) is discarded — tagging may be added in a later spec.
-4. ✅ All rows imported at their signed amount (no filtering of credits/income rows).
+4. ✅ All rows imported; amounts are negated so debits are positive and credits are negative (shared convention with AMEX: positive = money out, negative = money in).
 5. ✅ Deduplication uses the uniform `date + amount + description + source` composite key; `Referenz` (col 5) is discarded.
 6. ✅ Preamble is detected dynamically by finding the `Buchung;`-prefixed header row, not by a hardcoded line offset.
 7. ✅ Missing preamble → throw with a clear error message (not silent empty result, not graceful fallback).
