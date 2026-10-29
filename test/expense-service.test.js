@@ -345,4 +345,86 @@ describe('ExpenseService', () => {
     expect(data.skipped).toBe(1)
     expect(data.duplicates).toBe(0)
   })
+
+  // --- TARGOBANK parser tests ---
+
+  it('importExpenses - TARGOBANK happy path imports all rows', async () => {
+    const csv = fs.readFileSync(
+      path.join(__dirname, 'fixtures/targobank-sample.csv'), 'utf8'
+    )
+    const { data } = await POST('/odata/v4/expenses/importExpenses', {
+      bankType: 'TARGOBANK',
+      csv
+    })
+    expect(data.imported).toBe(5)
+    expect(data.skipped).toBe(0)
+    expect(data.duplicates).toBe(0)
+  })
+
+  it('importExpenses - TARGOBANK converts DD.MM.YYYY date to YYYY-MM-DD', async () => {
+    const csv = `13.01.2026;Lastschrift   TARGOBANK DATE MERCHANT   DE00111111111111111101   Test Ref;-10,00;;;;'DE00TEST'`
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'TARGOBANK DATE MERCHANT\'')
+    expect(data.value[0].date).toBe('2026-01-13')
+  })
+
+  it('importExpenses - TARGOBANK debit amount (col 2) negated to positive', async () => {
+    const csv = `20.01.2026;Kartenzahlung   TARGOBANK DEBIT SHOP   Teststadt 12345678   Kartennummer: 999999XXXXXX000X;-57,24;;;;'DE00TEST'`
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'TARGOBANK DEBIT SHOP\'')
+    expect(data.value[0].amount).toBe(57.24)
+  })
+
+  it('importExpenses - TARGOBANK credit amount (col 3) stored as negative', async () => {
+    const csv = `29.01.2026;Gutschrift Lohn  Gehalt  Rente   TARGOBANK CREDIT EMPLOYER   PAYROLL 12345/202601;;3165,03;;;'DE00TEST'`
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'TARGOBANK CREDIT EMPLOYER\'')
+    expect(data.value[0].amount).toBe(-3165.03)
+  })
+
+  it('importExpenses - TARGOBANK description uses second blob segment (counterparty)', async () => {
+    const csv = `15.01.2026;Lastschrift   TARGOBANK BLOB MERCHANT   DE00111111111111111101   Test Purpose;-25,00;;;;'DE00TEST'`
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'TARGOBANK BLOB MERCHANT\'')
+    expect(data.value).toHaveLength(1)
+  })
+
+  it('importExpenses - TARGOBANK description falls back to full blob when no 3+ space separator', async () => {
+    const csv = `16.01.2026;TARGOBANK FALLBACK DESC;-5,00;;;;'DE00TEST'`
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'TARGOBANK FALLBACK DESC\'')
+    expect(data.value).toHaveLength(1)
+  })
+
+  it('importExpenses - TARGOBANK zero-amount row is not imported', async () => {
+    const csv = `31.03.2026;Information Zinssaetze   SOLLZINSSAETZE: 13,73% P.A.;;0,00;;;'DE00TEST'`
+    const { data } = await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    expect(data.imported).toBe(0)
+  })
+
+  it('importExpenses - TARGOBANK invalid format returns 400', async () => {
+    const csv = 'not-a-targobank-file'
+    await expect(
+      POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    ).rejects.toMatchObject({ response: { status: 400 } })
+  })
+
+  it('importExpenses - TARGOBANK deduplication: re-importing same CSV counts as duplicates', async () => {
+    const csv = `22.01.2026;Lastschrift   TARGOBANK DEDUP SHOP   DE00111111111111111101   Test;-100,00;;;;'DE00TEST'`
+    const first = await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    expect(first.data.imported).toBe(1)
+    const second = await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    expect(second.data.imported).toBe(0)
+    expect(second.data.duplicates).toBe(1)
+  })
+
+  it('importExpenses - TARGOBANK malformed date row counted in skipped', async () => {
+    const csv = [
+      `13.01.2026;Lastschrift   TARGOBANK SKIP VALID   DE00111111111111111101   Test;-10,00;;;;'DE00TEST'`,
+      `BADDATE;Lastschrift   TARGOBANK BAD DATE ROW   DE00111111111111111101   Test;-5,00;;;;'DE00TEST'`
+    ].join('\n')
+    const { data } = await POST('/odata/v4/expenses/importExpenses', { bankType: 'TARGOBANK', csv })
+    expect(data.skipped).toBe(1)
+    expect(data.duplicates).toBe(0)
+  })
 })
