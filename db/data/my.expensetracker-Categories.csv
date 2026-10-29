@@ -1,9 +1,5 @@
 ID,name,icon
-1,Food,🍔
-2,Transport,🚗
+1,Grocery,🛒
+2,Shopping,🛍️
 3,Housing,🏠
-4,Health,💊
-5,Entertainment,🎬
-6,Shopping,🛍️
-7,Utilities,💡
-8,Other,📦
+4,Restaurants,🍽️

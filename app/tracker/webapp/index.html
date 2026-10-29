@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html style="height: 100%">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Personal Expense Tracker</title>
   <script id="sap-ui-bootstrap"
-    src="https://ui5.sap.com/1.120/resources/sap-ui-core.js"
+    src="https://ui5.sap.com/1.136/resources/sap-ui-core.js"
     data-sap-ui-theme="sap_horizon"
     data-sap-ui-compatVersion="edge"
     data-sap-ui-async="true"
@@ -14,12 +14,13 @@
     data-sap-ui-resourceroots='{"my.expensetracker.tracker": "./"}'
   ></script>
 </head>
-<body class="sapUiBody" id="content">
+<body class="sapUiBody" id="content" style="height: 100%; margin: 0;">
   <div data-sap-ui-component
     data-name="my.expensetracker.tracker"
     data-id="container"
     data-settings='{"id":"tracker"}'
-    style="height:100%">
+    data-height="100%"
+    style="height: 100%;">
   </div>
 </body>
 </html>

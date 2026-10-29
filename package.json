@@ -11,6 +11,7 @@
   },
   "scripts": {
     "start": "cds-serve",
+    "start:local": "cp db/data/prod/my.expensetracker-Expenses.csv db/data/my.expensetracker-Expenses.csv && cds watch --port 4005",
     "test": "jest --testTimeout=30000"
   },
   "private": true,
