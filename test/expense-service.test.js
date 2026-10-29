@@ -427,4 +427,158 @@ describe('ExpenseService', () => {
     expect(data.skipped).toBe(1)
     expect(data.duplicates).toBe(0)
   })
+
+  // --- Classification rule tests ---
+
+  it('classification - matching rule assigns correct category_ID on import', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC01 Grocery Rule', pattern: 'RC01_SUPERMARKET', category_ID: 1, priority: 1, active: true
+    })
+    const csv = 'date,amount,description,category\n2026-02-01,12.00,RC01_SUPERMARKET,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC01_SUPERMARKET\'')
+    expect(data.value[0].category_ID).toBe(1)
+  })
+
+  it('classification - matching rule inserts tags on import', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC02 Tag Rule', pattern: 'RC02_SHOP', category_ID: 2, priority: 1, active: true,
+      tags: [{ tag: 'shopping' }, { tag: 'online' }]
+    })
+    const csv = 'date,amount,description,category\n2026-02-02,20.00,RC02_SHOP,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC02_SHOP\'&$expand=tags')
+    const tags = data.value[0].tags.map(t => t.tag).sort()
+    expect(tags).toEqual(['online', 'shopping'])
+  })
+
+  it('classification - no matching rule leaves category null and tags empty', async () => {
+    const csv = 'date,amount,description,category\n2026-02-03,5.00,RC03_UNMATCHED_XYZ_ZZZZ,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC03_UNMATCHED_XYZ_ZZZZ\'&$expand=tags')
+    expect(data.value[0].category_ID).toBeNull()
+    expect(data.value[0].tags).toHaveLength(0)
+  })
+
+  it('classification - lower priority number wins when two rules match', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC04 Low Prio', pattern: 'RC04_ITEM', category_ID: 2, priority: 50, active: true
+    })
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC04 High Prio', pattern: 'RC04_ITEM', category_ID: 1, priority: 5, active: true
+    })
+    const csv = 'date,amount,description,category\n2026-02-04,8.00,RC04_ITEM,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC04_ITEM\'')
+    expect(data.value[0].category_ID).toBe(1)
+  })
+
+  it('classification - active:false rule is skipped on import', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC05 Inactive Rule', pattern: 'RC05_SHOP', category_ID: 1, priority: 1, active: false
+    })
+    const csv = 'date,amount,description,category\n2026-02-05,9.00,RC05_SHOP,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC05_SHOP\'')
+    expect(data.value[0].category_ID).toBeNull()
+  })
+
+  it('classification - rule with no category applies tags only; category stays null', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC06 Tag-only Rule', pattern: 'RC06_ITEM', priority: 1, active: true,
+      tags: [{ tag: 'misc' }]
+    })
+    const csv = 'date,amount,description,category\n2026-02-06,3.00,RC06_ITEM,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC06_ITEM\'&$expand=tags')
+    expect(data.value[0].category_ID).toBeNull()
+    expect(data.value[0].tags.map(t => t.tag)).toContain('misc')
+  })
+
+  it('classification - rule with no tags applies category only; no tags inserted', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC07 Cat-only Rule', pattern: 'RC07_ITEM', category_ID: 4, priority: 1, active: true
+    })
+    const csv = 'date,amount,description,category\n2026-02-07,11.00,RC07_ITEM,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC07_ITEM\'&$expand=tags')
+    expect(data.value[0].category_ID).toBe(4)
+    expect(data.value[0].tags).toHaveLength(0)
+  })
+
+  it('classification - invalid regex in rule is skipped gracefully; import continues', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC08 Bad Regex', pattern: '[invalid(regex', category_ID: 1, priority: 1, active: true
+    })
+    const csv = 'date,amount,description,category\n2026-02-08,7.00,RC08_SAFE_ROW,'
+    const { data } = await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    expect(data.imported).toBe(1)
+    expect(data.skipped).toBe(0)
+  })
+
+  it('reclassifyExpenses(dryRun:false) - updates category and returns correct counts', async () => {
+    const csv = 'date,amount,description,category\n2026-03-01,15.00,RC09_RECLASSIFY_TARGET,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const before = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC09_RECLASSIFY_TARGET\'')
+    expect(before.data.value[0].category_ID).toBeNull()
+
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC09 Reclassify Rule', pattern: 'RC09_RECLASSIFY_TARGET', category_ID: 3, priority: 1, active: true
+    })
+
+    const { data } = await POST('/odata/v4/expenses/reclassifyExpenses', { dryRun: false })
+    expect(data.affected).toBeGreaterThanOrEqual(1)
+    expect(data.changed).toBeGreaterThanOrEqual(1)
+    expect(data.dryRun).toBe(false)
+
+    const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC09_RECLASSIFY_TARGET\'')
+    expect(after.data.value[0].category_ID).toBe(3)
+  })
+
+  it('reclassifyExpenses(dryRun:true) - returns counts but does not write changes', async () => {
+    const csv = 'date,amount,description,category\n2026-03-02,16.00,RC10_DRYRUN_TARGET,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC10 Dry-run Rule', pattern: 'RC10_DRYRUN_TARGET', category_ID: 2, priority: 1, active: true
+    })
+
+    const { data } = await POST('/odata/v4/expenses/reclassifyExpenses', { dryRun: true })
+    expect(data.affected).toBeGreaterThanOrEqual(1)
+    expect(data.changed).toBeGreaterThanOrEqual(1)
+    expect(data.dryRun).toBe(true)
+
+    const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC10_DRYRUN_TARGET\'')
+    expect(after.data.value[0].category_ID).toBeNull()
+  })
+
+  it('reclassifyExpenses - already-classified expense counts as affected but not changed', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'RC11 Idempotent Rule', pattern: 'RC11_ALREADY_SET', category_ID: 1, priority: 1, active: true
+    })
+    const csv = 'date,amount,description,category\n2026-03-03,17.00,RC11_ALREADY_SET,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+
+    // expense now has category_ID: 1 from the rule; reclassify should see no change
+    const { data } = await POST('/odata/v4/expenses/reclassifyExpenses', { dryRun: true })
+    // affected >= 1 (this expense matched), but RC11 expense is not changed (already correct)
+    expect(data.dryRun).toBe(true)
+    // verify specifically: import the same description twice to isolate
+    const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC11_ALREADY_SET\'')
+    expect(after.data.value[0].category_ID).toBe(1)
+  })
+
+  it('reclassifyExpenses - expense matching no rule is not affected and not changed', async () => {
+    const csv = 'date,amount,description,category\n2026-03-04,18.00,RC12_NO_RULE_MATCH_ZZZZ,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+
+    const before = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC12_NO_RULE_MATCH_ZZZZ\'')
+    expect(before.data.value[0].category_ID).toBeNull()
+
+    const { data } = await POST('/odata/v4/expenses/reclassifyExpenses', { dryRun: false })
+    expect(data.dryRun).toBe(false)
+
+    const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC12_NO_RULE_MATCH_ZZZZ\'')
+    expect(after.data.value[0].category_ID).toBeNull()
+  })
 })

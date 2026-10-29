@@ -1,0 +1,5 @@
+ID,name,pattern,category_ID,priority,active
+11111111-0001-0000-0000-000000000001,Grocery,REWE|EDEKA|ALDI|LIDL|PENNY|NETTO|KAUFLAND,1,10,true
+11111111-0001-0000-0000-000000000002,Shopping,Amazon|Zalando|H&M|ZARA|Saturn|MediaMarkt,2,20,true
+11111111-0001-0000-0000-000000000003,Housing,Miete|VONOVIA|Stadtwerke|GEZ|Rundfunk,3,30,true
+11111111-0001-0000-0000-000000000004,Restaurants,McDonald|Burger King|Starbucks|KFC|Subway|Lieferando|Wolt,4,40,true

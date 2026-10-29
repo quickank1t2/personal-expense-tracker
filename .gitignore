@@ -15,5 +15,9 @@ mta_archives/
 # Other
 .DS_Store
 
+# Real bank data — never commit
+prod-data/
+db/data/prod/
+
 # @cap-js/cds-typer
 @cds-models

@@ -46,6 +46,37 @@ annotate ExpenseService.Budgets with @(
   }
 );
 
+annotate ExpenseService.ClassificationRules with @(
+  UI.LineItem: [
+    { Value: name,          Label: 'Name'     },
+    { Value: pattern,       Label: 'Pattern'  },
+    { Value: category.name, Label: 'Category' },
+    { Value: priority,      Label: 'Priority' },
+    { Value: active,        Label: 'Active'   }
+  ],
+  UI.HeaderInfo: {
+    TypeName:       'Rule',
+    TypeNamePlural: 'Rules',
+    Title:          { Value: name }
+  },
+  UI.Facets: [
+    {
+      $Type:  'UI.ReferenceFacet',
+      Label:  'Details',
+      Target: '@UI.FieldGroup#Details'
+    }
+  ],
+  UI.FieldGroup#Details: {
+    Data: [
+      { Value: name                         },
+      { Value: pattern                      },
+      { Value: category_ID, Label: 'Category' },
+      { Value: priority                     },
+      { Value: active                       }
+    ]
+  }
+);
+
 annotate ExpenseService.Categories with @(
   UI.LineItem: [
     { Value: name, Label: 'Category' },
