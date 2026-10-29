@@ -249,4 +249,100 @@ describe('ExpenseService', () => {
     expect(data.skipped).toBe(1)
     expect(data.duplicates).toBe(0)
   })
+
+  // --- SPARKASSE parser tests ---
+
+  const SPARKASSE_HDR = '"Order account";"Day of entry";"Value date";"Posting text";"Purpose";"Creditor ID";"Mandate reference";"Customer reference (End-to-End)";"Collective order reference";"Original direct debit amount";"Reimbursement of expenses for returning a direct debit";"Beneficiary/payer";"Account number / IBAN";"BIC (SWIFT code)";"Amount";"Currency";"Info";"Category"'
+
+  it('importExpenses - SPARKASSE happy path imports all rows', async () => {
+    const csv = fs.readFileSync(
+      path.join(__dirname, 'fixtures/sparkasse-sample.csv'), 'utf8'
+    )
+    const { data } = await POST('/odata/v4/expenses/importExpenses', {
+      bankType: 'SPARKASSE',
+      csv
+    })
+    expect(data.imported).toBe(5)
+    expect(data.skipped).toBe(0)
+    expect(data.duplicates).toBe(0)
+  })
+
+  it('importExpenses - SPARKASSE converts DD.MM.YY date to YYYY-MM-DD', async () => {
+    const csv = [
+      SPARKASSE_HDR,
+      '"DE00TEST";"28.10.26";"";"KARTENZAHLUNG";"terminal ref";"";"";"";"";"";"";"SPARKASSE DATE MERCHANT";"";"";"-10,00";"EUR";"";""'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SPARKASSE DATE MERCHANT\'')
+    expect(data.value[0].date).toBe('2026-10-28')
+  })
+
+  it('importExpenses - SPARKASSE debit amount negated to positive', async () => {
+    const csv = [
+      SPARKASSE_HDR,
+      '"DE00TEST";"05.10.26";"";"KARTENZAHLUNG";"terminal ref";"";"";"";"";"";"";"SPARKASSE DEBIT SHOP";"";"";"-33,27";"EUR";"";""'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SPARKASSE DEBIT SHOP\'')
+    expect(data.value[0].amount).toBe(33.27)
+  })
+
+  it('importExpenses - SPARKASSE credit row stored as negative amount', async () => {
+    const csv = [
+      SPARKASSE_HDR,
+      '"DE00TEST";"10.10.26";"";"ECHTZEIT-GUTSCHRIFT";"SPARKASSE CREDIT PURPOSE";"";"";"";"";"";"";"";"";"";"150,00";"EUR";"";""'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SPARKASSE CREDIT PURPOSE\'')
+    expect(data.value[0].amount).toBe(-150)
+  })
+
+  it('importExpenses - SPARKASSE description uses beneficiary (col 11) as primary', async () => {
+    const csv = [
+      SPARKASSE_HDR,
+      '"DE00TEST";"12.10.26";"";"KARTENZAHLUNG";"2026-10-12T09:00 Debitk.4 2029-12 ";"";"";"";"";"";"";"SPARKASSE BENEFICIARY NAME";"";"";"-20,00";"EUR";"";""'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SPARKASSE BENEFICIARY NAME\'')
+    expect(data.value).toHaveLength(1)
+  })
+
+  it('importExpenses - SPARKASSE description falls back to purpose (col 4) when col 11 is empty', async () => {
+    const csv = [
+      SPARKASSE_HDR,
+      '"DE00TEST";"13.10.26";"";"ABSCHLUSS";"SPARKASSE PURPOSE TEXT";"";"";"";"";"";"";"";"";"";"-5,50";"EUR";"";""'
+    ].join('\n')
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SPARKASSE PURPOSE TEXT\'')
+    expect(data.value).toHaveLength(1)
+  })
+
+  it('importExpenses - SPARKASSE missing header returns 400 with descriptive message', async () => {
+    const csv = 'not-a-sparkasse-file'
+    await expect(
+      POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    ).rejects.toMatchObject({ response: { status: 400 } })
+  })
+
+  it('importExpenses - SPARKASSE deduplication: re-importing same CSV counts as duplicates', async () => {
+    const csv = [
+      SPARKASSE_HDR,
+      '"DE00TEST";"22.10.26";"";"ECHTZEIT-UEBERWEISUNG";"Miete Test";"";"";"";"";"";"";"SPARKASSE DEDUP SHOP";"";"";"-600,00";"EUR";"";""'
+    ].join('\n')
+    const first = await POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    expect(first.data.imported).toBe(1)
+    const second = await POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    expect(second.data.imported).toBe(0)
+    expect(second.data.duplicates).toBe(1)
+  })
+
+  it('importExpenses - SPARKASSE malformed row (bad date) counted in skipped', async () => {
+    const csv = [
+      SPARKASSE_HDR,
+      '"DE00TEST";"BADDATE";"";"KARTENZAHLUNG";"bad row";"";"";"";"";"";"";"SPARKASSE BAD DATE ROW";"";"";"-7,00";"EUR";"";""'
+    ].join('\n')
+    const { data } = await POST('/odata/v4/expenses/importExpenses', { bankType: 'SPARKASSE', csv })
+    expect(data.skipped).toBe(1)
+    expect(data.duplicates).toBe(0)
+  })
 })

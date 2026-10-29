@@ -1,0 +1,6 @@
+"Order account";"Day of entry";"Value date";"Posting text";"Purpose";"Creditor ID";"Mandate reference";"Customer reference (End-to-End)";"Collective order reference";"Original direct debit amount";"Reimbursement of expenses for returning a direct debit";"Beneficiary/payer";"Account number / IBAN";"BIC (SWIFT code)";"Amount";"Currency";"Info";"Category"
+"DE00123456789012345678";"28.10.26";"";"KARTENZAHLUNG";"2026-10-28T17:53 Debitk.4 2029-12 ";"";"";"";"";"";"";"Asia Restaurant Berlin";"DE11500105170648489890";"BELADEBEXXX";"-33,27";"EUR";"";""
+"DE00123456789012345678";"01.10.26";"";"FOLGELASTSCHRIFT";"Telekom Kundennr 12345678 Rechnung Oktober";"DE98ZZZ09999999999";"TKOM-12345678";"12345678";"";"";"";"Deutsche Telekom AG";"DE66700400480540100100";"COBADEFFXXX";"-49,99";"EUR";"";""
+"DE00123456789012345678";"15.10.26";"";"ECHTZEIT-GUTSCHRIFT";"Erstattung Miete Oktober";"";"";"TRANSFER-REF-001";"";"";"";"";"";"";"150,00";"EUR";"";""
+"DE00123456789012345678";"30.09.26";"";"ABSCHLUSS";"Abrechnung 30.09.2026 siehe Anlage";"";"";"";"";"";"";"";"";"";"-5,50";"EUR";"";""
+"DE00123456789012345678";"20.10.26";"";"ECHTZEIT-UEBERWEISUNG";"Miete Oktober 2026";"";"";"MIETE-OCT-2026";"";"";"";"Max Mustermann";"DE22333344445555666677";"SSKMDEMMXXX";"-800,00";"EUR";"";""
