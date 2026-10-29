@@ -8,6 +8,7 @@ entity ClassificationRules : cuid {
   category : Association to Categories;
   priority : Integer default 100;
   active   : Boolean default true;
+  setIgnored : Boolean default false;
   tags     : Composition of many {
     key tag : String(50);
   };

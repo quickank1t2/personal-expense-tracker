@@ -452,11 +452,11 @@ describe('ExpenseService', () => {
     expect(tags).toEqual(['online', 'shopping'])
   })
 
-  it('classification - no matching rule leaves category null and tags empty', async () => {
+  it('classification - no matching rule defaults category to Uncategorized and tags empty', async () => {
     const csv = 'date,amount,description,category\n2026-02-03,5.00,RC03_UNMATCHED_XYZ_ZZZZ,'
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
     const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC03_UNMATCHED_XYZ_ZZZZ\'&$expand=tags')
-    expect(data.value[0].category_ID).toBeNull()
+    expect(data.value[0].category_ID).toBe(2)
     expect(data.value[0].tags).toHaveLength(0)
   })
 
@@ -480,10 +480,10 @@ describe('ExpenseService', () => {
     const csv = 'date,amount,description,category\n2026-02-05,9.00,RC05_SHOP,'
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
     const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC05_SHOP\'')
-    expect(data.value[0].category_ID).toBeNull()
+    expect(data.value[0].category_ID).toBe(2)
   })
 
-  it('classification - rule with no category applies tags only; category stays null', async () => {
+  it('classification - rule with no category applies tags only; category defaults to Uncategorized', async () => {
     await POST('/odata/v4/expenses/ClassificationRules', {
       name: 'RC06 Tag-only Rule', pattern: 'RC06_ITEM', priority: 1, active: true,
       tags: [{ tag: 'misc' }]
@@ -491,7 +491,7 @@ describe('ExpenseService', () => {
     const csv = 'date,amount,description,category\n2026-02-06,3.00,RC06_ITEM,'
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
     const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC06_ITEM\'&$expand=tags')
-    expect(data.value[0].category_ID).toBeNull()
+    expect(data.value[0].category_ID).toBe(2)
     expect(data.value[0].tags.map(t => t.tag)).toContain('misc')
   })
 
@@ -520,7 +520,7 @@ describe('ExpenseService', () => {
     const csv = 'date,amount,description,category\n2026-03-01,15.00,RC09_RECLASSIFY_TARGET,'
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
     const before = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC09_RECLASSIFY_TARGET\'')
-    expect(before.data.value[0].category_ID).toBeNull()
+    expect(before.data.value[0].category_ID).toBe(2)
 
     await POST('/odata/v4/expenses/ClassificationRules', {
       name: 'RC09 Reclassify Rule', pattern: 'RC09_RECLASSIFY_TARGET', category_ID: 3, priority: 1, active: true
@@ -540,7 +540,7 @@ describe('ExpenseService', () => {
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
 
     await POST('/odata/v4/expenses/ClassificationRules', {
-      name: 'RC10 Dry-run Rule', pattern: 'RC10_DRYRUN_TARGET', category_ID: 2, priority: 1, active: true
+      name: 'RC10 Dry-run Rule', pattern: 'RC10_DRYRUN_TARGET', category_ID: 3, priority: 1, active: true
     })
 
     const { data } = await POST('/odata/v4/expenses/reclassifyExpenses', { dryRun: true })
@@ -549,7 +549,7 @@ describe('ExpenseService', () => {
     expect(data.dryRun).toBe(true)
 
     const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC10_DRYRUN_TARGET\'')
-    expect(after.data.value[0].category_ID).toBeNull()
+    expect(after.data.value[0].category_ID).toBe(2)
   })
 
   it('reclassifyExpenses - already-classified expense counts as affected but not changed', async () => {
@@ -588,12 +588,12 @@ describe('ExpenseService', () => {
   })
 
   it('ignored - reclassifyExpenses does not update an ignored expense', async () => {
-    // import first (no rule yet → category_ID is null)
+    // import first (no rule yet → category defaults to Uncategorized)
     const csv = 'date,amount,description,category\n2026-04-03,70.00,IG03_IGNORED_TARGET,'
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
     const { data: imported } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'IG03_IGNORED_TARGET\'')
     const id = imported.value[0].ID
-    expect(imported.value[0].category_ID).toBeNull()
+    expect(imported.value[0].category_ID).toBe(2)
     // mark as ignored
     await PATCH(`/odata/v4/expenses/Expenses(${id})`, { ignored: true })
     // now add a rule that would match
@@ -603,7 +603,7 @@ describe('ExpenseService', () => {
     // reclassify — rule matches but expense is ignored, so no change
     await POST('/odata/v4/expenses/reclassifyExpenses', { dryRun: false })
     const { data: after } = await GET(`/odata/v4/expenses/Expenses(${id})`)
-    expect(after.category_ID).toBeNull()
+    expect(after.category_ID).toBe(2)
     expect(after.ignored).toBe(true)
   })
 
@@ -612,12 +612,89 @@ describe('ExpenseService', () => {
     await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
 
     const before = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC12_NO_RULE_MATCH_ZZZZ\'')
-    expect(before.data.value[0].category_ID).toBeNull()
+    expect(before.data.value[0].category_ID).toBe(2)
 
     const { data } = await POST('/odata/v4/expenses/reclassifyExpenses', { dryRun: false })
     expect(data.dryRun).toBe(false)
 
     const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC12_NO_RULE_MATCH_ZZZZ\'')
-    expect(after.data.value[0].category_ID).toBeNull()
+    expect(after.data.value[0].category_ID).toBe(2)
+  })
+
+  // --- syncNow action (toolbar button) ---
+
+  it('syncNow - reclassifies matching expenses and returns counts', async () => {
+    const csv = 'date,amount,description,category\n2026-05-01,21.00,SYNC01_TARGET,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const before = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SYNC01_TARGET\'')
+    expect(before.data.value[0].category_ID).toBe(2)
+
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'SYNC01 Rule', pattern: 'SYNC01_TARGET', category_ID: 4, priority: 1, active: true
+    })
+
+    const { data } = await POST('/odata/v4/expenses/syncNow', {})
+    expect(data.affected).toBeGreaterThanOrEqual(1)
+    expect(data.changed).toBeGreaterThanOrEqual(1)
+
+    const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SYNC01_TARGET\'')
+    expect(after.data.value[0].category_ID).toBe(4)
+  })
+
+  it('syncNow - does not update an ignored expense', async () => {
+    const csv = 'date,amount,description,category\n2026-05-02,22.00,SYNC02_IGNORED,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data: imported } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SYNC02_IGNORED\'')
+    const id = imported.value[0].ID
+    await PATCH(`/odata/v4/expenses/Expenses(${id})`, { ignored: true })
+
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'SYNC02 Rule', pattern: 'SYNC02_IGNORED', category_ID: 1, priority: 1, active: true
+    })
+
+    await POST('/odata/v4/expenses/syncNow', {})
+    const { data: after } = await GET(`/odata/v4/expenses/Expenses(${id})`)
+    expect(after.category_ID).toBe(2)
+    expect(after.ignored).toBe(true)
+  })
+
+  // --- setIgnored rules ---
+
+  it('setIgnored - import with a setIgnored rule stamps ignored=true', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'SI01 Ignore Rule', pattern: 'SI01_SALARY', category_ID: 2, priority: 1, active: true, setIgnored: true
+    })
+    const csv = 'date,amount,description,category\n2026-06-01,-3000.00,SI01_SALARY,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SI01_SALARY\'')
+    expect(data.value[0].ignored).toBe(true)
+  })
+
+  it('setIgnored - import without setIgnored rule keeps ignored=false', async () => {
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'SI02 Plain Rule', pattern: 'SI02_SHOP', category_ID: 1, priority: 1, active: true, setIgnored: false
+    })
+    const csv = 'date,amount,description,category\n2026-06-02,15.00,SI02_SHOP,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SI02_SHOP\'')
+    expect(data.value[0].ignored).toBe(false)
+    expect(data.value[0].category_ID).toBe(1)
+  })
+
+  it('setIgnored - syncNow sets ignored=true on a matching non-ignored expense', async () => {
+    const csv = 'date,amount,description,category\n2026-06-03,-500.00,SI03_TRANSFER,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const before = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SI03_TRANSFER\'')
+    expect(before.data.value[0].ignored).toBe(false)
+
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'SI03 Ignore Rule', pattern: 'SI03_TRANSFER', category_ID: 2, priority: 1, active: true, setIgnored: true
+    })
+
+    const { data } = await POST('/odata/v4/expenses/syncNow', {})
+    expect(data.changed).toBeGreaterThanOrEqual(1)
+
+    const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'SI03_TRANSFER\'')
+    expect(after.data.value[0].ignored).toBe(true)
   })
 })

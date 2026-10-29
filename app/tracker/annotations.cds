@@ -1,7 +1,20 @@
 using ExpenseService from '../../srv/apis/expense-service';
 
 annotate ExpenseService.Expenses with @(
-  UI.SelectionFields: [ ignored ],
+  Capabilities.FilterRestrictions: {
+    FilterExpressionRestrictions: [{
+      Property:           date,
+      AllowedExpressions: 'SingleRange'
+    }]
+  },
+  UI.SelectionFields: [ date, category_ID, ignored ],
+  UI.PresentationVariant: {
+    SortOrder: [{
+      Property:   date,
+      Descending: true
+    }],
+    Visualizations: ['@UI.LineItem']
+  },
   UI.SelectionVariant: {
     SelectOptions: [{
       PropertyName: ignored,
@@ -44,6 +57,25 @@ annotate ExpenseService.Expenses with @(
     ]
   }
 );
+
+annotate ExpenseService.Expenses with {
+  category @(
+    Common.ValueList: {
+      CollectionPath: 'Categories',
+      Parameters: [
+        {
+          $Type:             'Common.ValueListParameterInOut',
+          LocalDataProperty: category_ID,
+          ValueListProperty: 'ID'
+        },
+        {
+          $Type:             'Common.ValueListParameterDisplayOnly',
+          ValueListProperty: 'name'
+        }
+      ]
+    }
+  );
+}
 
 annotate ExpenseService.Budgets with @(
   UI.LineItem: [

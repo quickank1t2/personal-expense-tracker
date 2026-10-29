@@ -65,6 +65,33 @@
             "settings": {
               "entitySet": "Expenses",
               "variantManagement": "Control",
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.SelectionFields": {
+                  "filterFields": {
+                    "date": {
+                      "settings": {
+                        "defaultValues": [
+                          { "operator": "THISMONTH" }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "@com.sap.vocabularies.UI.v1.LineItem": {
+                  "tableSettings": {
+                    "selectionMode": "Multi",
+                    "enableMassEdit": true
+                  },
+                  "actions": {
+                    "syncNow": {
+                      "press": "my.expensetracker.tracker.ext.SyncNow.onSyncNow",
+                      "visible": true,
+                      "enabled": true,
+                      "text": "Sync Now"
+                    }
+                  }
+                }
+              },
               "navigation": {
                 "Expenses": {
                   "detail": {

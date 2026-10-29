@@ -2,6 +2,7 @@
   "name": "personal-expense-tracker",
   "version": "1.0.0",
   "dependencies": {
+    "@cap-js/postgres": "^2.3.3",
     "@sap/cds": "^9"
   },
   "devDependencies": {
@@ -16,7 +17,10 @@
   },
   "private": true,
   "cds": {
-    "model": ["db", "srv"],
+    "model": [
+      "db",
+      "srv"
+    ],
     "requires": {
       "auth": {
         "kind": "mocked",
@@ -32,6 +36,14 @@
     "[development]": {
       "requires": {
         "auth": "dummy"
+      }
+    },
+    "[postgres]": {
+      "requires": {
+        "db": {
+          "kind": "postgres",
+          "impl": "@cap-js/postgres"
+        }
       }
     }
   }

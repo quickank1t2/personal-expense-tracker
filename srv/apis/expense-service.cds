@@ -14,4 +14,7 @@ service ExpenseService @(requires: 'User') {
 
   action reclassifyExpenses(dryRun: Boolean)
     returns { affected: Integer; changed: Integer; dryRun: Boolean };
+
+  action syncNow()
+    returns { affected: Integer; changed: Integer };
 }

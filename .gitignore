@@ -14,6 +14,7 @@ mta_archives/
 
 # Other
 .DS_Store
+.env
 
 # Real bank data — never commit
 prod-data/
