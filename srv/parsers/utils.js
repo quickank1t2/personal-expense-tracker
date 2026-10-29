@@ -7,13 +7,13 @@ function parseRows(csv, mapFn) {
   }).filter(Boolean)
 }
 
-function parseCsvRow(line) {
+function parseCsvRow(line, delimiter = ',') {
   const cols = []
   let cur = '', inQuotes = false
   for (let i = 0; i < line.length; i++) {
     const ch = line[i]
     if (ch === '"') { inQuotes = !inQuotes }
-    else if (ch === ',' && !inQuotes) { cols.push(cur); cur = '' }
+    else if (ch === delimiter && !inQuotes) { cols.push(cur); cur = '' }
     else { cur += ch }
   }
   cols.push(cur)
@@ -25,7 +25,8 @@ function parseEuropeanDate(str) {
   const sep = str.includes('/') ? '/' : '.'
   const [d, m, y] = str.split(sep)
   if (!d || !m || !y) return null
-  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  const fullYear = y.length === 2 ? `20${y}` : y
+  return `${fullYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
 function normaliseText(str) {
