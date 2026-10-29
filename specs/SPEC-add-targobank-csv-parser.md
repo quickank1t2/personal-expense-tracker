@@ -1,6 +1,6 @@
 # SPEC: Add TargoBank CSV Parser
 
-**Status:** draft
+**Status:** implemented
 **Created:** 2026-10-29
 **Slug:** add-targobank-csv-parser
 **GitHub Issue:** https://github.com/quickank1t2/personal-expense-tracker/issues/6
