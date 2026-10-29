@@ -20,6 +20,58 @@ async function loadActiveRules(ClassificationRules) {
   return rules
 }
 
+async function reclassify({ Expenses, ClassificationRules }, dryRun) {
+  const rules = await loadActiveRules(ClassificationRules)
+
+  const expenses = await SELECT.from(Expenses)
+  const allExpenseTags = await SELECT.from('my.expensetracker.Expenses.tags')
+  const expTagsMap = {}
+  for (const t of allExpenseTags) (expTagsMap[t.up__ID] = expTagsMap[t.up__ID] || []).push(t.tag)
+
+  let affected = 0, changed = 0
+
+  for (const expense of expenses) {
+    if (expense.ignored) continue
+    const matched = applyRules(rules, expense.description ?? '')
+    if (!matched) continue
+
+    affected++
+
+    const newCategoryID = matched.category_ID ?? expense.category_ID
+    const existingTags = (expTagsMap[expense.ID] || []).slice().sort()
+    const newTags = matched.tags.length ? matched.tags.slice().sort() : existingTags
+    const newIgnored = matched.setIgnored ? true : expense.ignored
+
+    const catChanged = newCategoryID !== expense.category_ID
+    const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(existingTags)
+    const ignoredChanged = newIgnored !== expense.ignored
+
+    if (catChanged || tagsChanged || ignoredChanged) {
+      changed++
+      if (!dryRun) {
+        if (!tagsChanged) {
+          await UPDATE(Expenses).set({ category_ID: newCategoryID, ignored: newIgnored }).where({ ID: expense.ID })
+        } else {
+          // Deep DELETE + INSERT to correctly replace composition tags
+          await DELETE.from(Expenses).where({ ID: expense.ID })
+          await INSERT.into(Expenses).entries({
+            ID:          expense.ID,
+            date:        expense.date,
+            amount:      expense.amount,
+            description: expense.description,
+            category_ID: newCategoryID,
+            source:      expense.source,
+            ignored:     newIgnored,
+            tags:        newTags.map(tag => ({ tag }))
+          })
+        }
+      }
+    }
+  }
+
+  return { affected, changed }
+}
+
 module.exports = class ExpenseService extends cds.ApplicationService {
   async init() {
     const { Expenses, Categories, ClassificationRules } = this.entities
@@ -39,6 +91,7 @@ module.exports = class ExpenseService extends cds.ApplicationService {
 
       const allCategories = await SELECT.from(Categories)
       const catByName = Object.fromEntries(allCategories.map(c => [c.name.toLowerCase(), c.ID]))
+      const uncategorizedID = catByName['uncategorized'] ?? null
 
       const rules = await loadActiveRules(ClassificationRules)
 
@@ -61,9 +114,10 @@ module.exports = class ExpenseService extends cds.ApplicationService {
           : null
 
         const matched = applyRules(rules, description)
-        const category_ID = matched ? (matched.category_ID ?? catFromParser) : catFromParser
+        const category_ID = (matched ? (matched.category_ID ?? catFromParser) : catFromParser) ?? uncategorizedID
 
         const entry = { date: row.date, amount: row.amount, description, category_ID, source: bankType }
+        if (matched?.setIgnored) entry.ignored = true
         if (matched?.tags.length) entry.tags = matched.tags.map(tag => ({ tag }))
 
         await INSERT.into(Expenses).entries(entry)
@@ -75,53 +129,13 @@ module.exports = class ExpenseService extends cds.ApplicationService {
 
     this.on('reclassifyExpenses', async (req) => {
       const { dryRun = false } = req.data
-
-      const rules = await loadActiveRules(ClassificationRules)
-
-      const expenses = await SELECT.from(Expenses)
-      const allExpenseTags = await SELECT.from('my.expensetracker.Expenses.tags')
-      const expTagsMap = {}
-      for (const t of allExpenseTags) (expTagsMap[t.up__ID] = expTagsMap[t.up__ID] || []).push(t.tag)
-
-      let affected = 0, changed = 0
-
-      for (const expense of expenses) {
-        if (expense.ignored) continue
-        const matched = applyRules(rules, expense.description ?? '')
-        if (!matched) continue
-
-        affected++
-
-        const newCategoryID = matched.category_ID ?? expense.category_ID
-        const existingTags = (expTagsMap[expense.ID] || []).slice().sort()
-        const newTags = matched.tags.length ? matched.tags.slice().sort() : existingTags
-
-        const catChanged = newCategoryID !== expense.category_ID
-        const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(existingTags)
-
-        if (catChanged || tagsChanged) {
-          changed++
-          if (!dryRun) {
-            if (catChanged && !tagsChanged) {
-              await UPDATE(Expenses).set({ category_ID: newCategoryID }).where({ ID: expense.ID })
-            } else {
-              // Deep DELETE + INSERT to correctly replace composition tags
-              await DELETE.from(Expenses).where({ ID: expense.ID })
-              await INSERT.into(Expenses).entries({
-                ID:          expense.ID,
-                date:        expense.date,
-                amount:      expense.amount,
-                description: expense.description,
-                category_ID: newCategoryID,
-                source:      expense.source,
-                tags:        newTags.map(tag => ({ tag }))
-              })
-            }
-          }
-        }
-      }
-
+      const { affected, changed } = await reclassify({ Expenses, ClassificationRules }, dryRun)
       return { affected, changed, dryRun }
+    })
+
+    this.on('syncNow', async () => {
+      const { affected, changed } = await reclassify({ Expenses, ClassificationRules }, false)
+      return { affected, changed }
     })
 
     return super.init()
