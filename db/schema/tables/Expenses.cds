@@ -8,6 +8,7 @@ entity Expenses : cuid {
   description : String(500);
   category    : Association to Categories;
   source      : String(50);
+  ignored     : Boolean default false;
   tags        : Composition of many {
     key tag : String(50);
   };

@@ -13,7 +13,7 @@ function applyRules(rules, description) {
 async function loadActiveRules(ClassificationRules) {
   const rules = await SELECT.from(ClassificationRules).where({ active: true }).orderBy('priority asc')
   if (!rules.length) return rules
-  const allTags = await SELECT.from('my.expensetracker.ClassificationRules_tags')
+  const allTags = await SELECT.from('my.expensetracker.ClassificationRules.tags')
   const tagsByRule = {}
   for (const t of allTags) (tagsByRule[t.up__ID] = tagsByRule[t.up__ID] || []).push(t.tag)
   for (const rule of rules) rule.tags = tagsByRule[rule.ID] || []
@@ -78,14 +78,15 @@ module.exports = class ExpenseService extends cds.ApplicationService {
 
       const rules = await loadActiveRules(ClassificationRules)
 
-      const expenses = await SELECT.from(Expenses).columns('ID', 'description', 'category_ID')
-      const allExpenseTags = await SELECT.from('my.expensetracker.Expenses_tags')
+      const expenses = await SELECT.from(Expenses)
+      const allExpenseTags = await SELECT.from('my.expensetracker.Expenses.tags')
       const expTagsMap = {}
       for (const t of allExpenseTags) (expTagsMap[t.up__ID] = expTagsMap[t.up__ID] || []).push(t.tag)
 
       let affected = 0, changed = 0
 
       for (const expense of expenses) {
+        if (expense.ignored) continue
         const matched = applyRules(rules, expense.description ?? '')
         if (!matched) continue
 
@@ -101,14 +102,20 @@ module.exports = class ExpenseService extends cds.ApplicationService {
         if (catChanged || tagsChanged) {
           changed++
           if (!dryRun) {
-            if (catChanged)
+            if (catChanged && !tagsChanged) {
               await UPDATE(Expenses).set({ category_ID: newCategoryID }).where({ ID: expense.ID })
-            if (tagsChanged) {
-              await DELETE.from('my.expensetracker.Expenses_tags').where({ up__ID: expense.ID })
-              if (newTags.length)
-                await INSERT.into('my.expensetracker.Expenses_tags').entries(
-                  newTags.map(tag => ({ up__ID: expense.ID, tag }))
-                )
+            } else {
+              // Deep DELETE + INSERT to correctly replace composition tags
+              await DELETE.from(Expenses).where({ ID: expense.ID })
+              await INSERT.into(Expenses).entries({
+                ID:          expense.ID,
+                date:        expense.date,
+                amount:      expense.amount,
+                description: expense.description,
+                category_ID: newCategoryID,
+                source:      expense.source,
+                tags:        newTags.map(tag => ({ tag }))
+              })
             }
           }
         }

@@ -25,7 +25,7 @@
   },
   "sap.ui5": {
     "dependencies": {
-      "minUI5Version": "1.120.0",
+      "minUI5Version": "1.136.0",
       "libs": {
         "sap.m": {},
         "sap.ui.core": {},
@@ -64,7 +64,7 @@
           "options": {
             "settings": {
               "entitySet": "Expenses",
-              "variantManagement": "Page",
+              "variantManagement": "Control",
               "navigation": {
                 "Expenses": {
                   "detail": {

@@ -1,12 +1,24 @@
 using ExpenseService from '../../srv/apis/expense-service';
 
 annotate ExpenseService.Expenses with @(
+  UI.SelectionFields: [ ignored ],
+  UI.SelectionVariant: {
+    SelectOptions: [{
+      PropertyName: ignored,
+      Ranges: [{
+        Sign: #I,
+        Option: #EQ,
+        Low: false
+      }]
+    }]
+  },
   UI.LineItem: [
     { Value: date,              Label: 'Date'        },
     { Value: description,       Label: 'Description' },
     { Value: category.name,     Label: 'Category'    },
     { Value: amount,            Label: 'Amount'      },
-    { Value: source,            Label: 'Source'      }
+    { Value: source,            Label: 'Source'      },
+    { Value: ignored,           Label: 'Ignored'     }
   ],
   UI.HeaderInfo: {
     TypeName:       'Expense',
@@ -27,7 +39,8 @@ annotate ExpenseService.Expenses with @(
       { Value: amount      },
       { Value: description },
       { Value: category_ID, Label: 'Category' },
-      { Value: source      }
+      { Value: source      },
+      { Value: ignored     }
     ]
   }
 );

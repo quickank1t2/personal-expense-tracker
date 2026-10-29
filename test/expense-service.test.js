@@ -4,7 +4,7 @@ const fs = require('fs')
 const path = require('path')
 
 describe('ExpenseService', () => {
-  const { GET, POST } = cds.test(__dirname + '/..').in(__dirname + '/..')
+  const { GET, POST, PATCH } = cds.test(__dirname + '/..').in(__dirname + '/..')
 
   it('returns all expenses', async () => {
     const { data } = await GET('/odata/v4/expenses/Expenses')
@@ -566,6 +566,45 @@ describe('ExpenseService', () => {
     // verify specifically: import the same description twice to isolate
     const after = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'RC11_ALREADY_SET\'')
     expect(after.data.value[0].category_ID).toBe(1)
+  })
+
+  // --- ignored flag tests ---
+
+  it('ignored - imported expense has ignored = false by default', async () => {
+    const csv = 'date,amount,description,category\n2026-04-01,50.00,IG01_DEFAULT_IGNORED,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'IG01_DEFAULT_IGNORED\'')
+    expect(data.value[0].ignored).toBe(false)
+  })
+
+  it('ignored - PATCH ignored = true persists', async () => {
+    const csv = 'date,amount,description,category\n2026-04-02,60.00,IG02_PATCH_TRUE,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data: before } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'IG02_PATCH_TRUE\'')
+    const id = before.value[0].ID
+    await PATCH(`/odata/v4/expenses/Expenses(${id})`, { ignored: true })
+    const { data: after } = await GET(`/odata/v4/expenses/Expenses(${id})`)
+    expect(after.ignored).toBe(true)
+  })
+
+  it('ignored - reclassifyExpenses does not update an ignored expense', async () => {
+    // import first (no rule yet → category_ID is null)
+    const csv = 'date,amount,description,category\n2026-04-03,70.00,IG03_IGNORED_TARGET,'
+    await POST('/odata/v4/expenses/importExpenses', { bankType: 'GENERIC', csv })
+    const { data: imported } = await GET('/odata/v4/expenses/Expenses?$filter=description eq \'IG03_IGNORED_TARGET\'')
+    const id = imported.value[0].ID
+    expect(imported.value[0].category_ID).toBeNull()
+    // mark as ignored
+    await PATCH(`/odata/v4/expenses/Expenses(${id})`, { ignored: true })
+    // now add a rule that would match
+    await POST('/odata/v4/expenses/ClassificationRules', {
+      name: 'IG03 Rule', pattern: 'IG03_IGNORED_TARGET', category_ID: 1, priority: 1, active: true
+    })
+    // reclassify — rule matches but expense is ignored, so no change
+    await POST('/odata/v4/expenses/reclassifyExpenses', { dryRun: false })
+    const { data: after } = await GET(`/odata/v4/expenses/Expenses(${id})`)
+    expect(after.category_ID).toBeNull()
+    expect(after.ignored).toBe(true)
   })
 
   it('reclassifyExpenses - expense matching no rule is not affected and not changed', async () => {
